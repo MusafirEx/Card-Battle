@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Firebase Login with Card DB</title>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js"></script>
+  <style>
+    body { font-family: sans-serif; text-align: center; margin-top: 50px; }
+    input { margin: 5px; }
+    .hidden { display: none; }
+    #cardGrid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 10px;
+      padding: 20px;
+      margin-top: 30px;
+    }
+    .card {
+      border: 1px solid #aaa;
+      border-radius: 8px;
+      background: #fff;
+      padding: 10px;
+    }
+    .card img {
+      width: 100%;
+      border-radius: 6px;
+    }
+    .card h4, .card p {
+      margin: 5px 0;
+    }
+    #message {
+      margin-top: 10px;
+      color: green;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>Login to Duel</h2>
+
+  <div id="loginDiv">
+    <input type="email" id="email" placeholder="Email" /><br/>
+    <input type="password" id="password" placeholder="Password" /><br/>
+    <button onclick="login()">Login</button>
+    <button onclick="register()">Register</button>
+    <div id="message"></div>
+  </div>
+
+  <div id="userDiv" class="hidden">
+    <p>Welcome, <span id="userEmail"></span></p>
+    <p>Your UID: <span id="userUid"></span></p>
+    <button onclick="logout()">Logout</button>
+  </div>
+
+  <div id="cardGrid" class="hidden"></div>
+
+  <!-- Firebase and App Logic -->
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyD0ytMu3i0_Qpzvzwg4cD4CKnfEbTd3t4Q",
+      authDomain: "zcg-web-base.firebaseapp.com",
+      projectId: "zcg-web-base",
+      appId: "1:509589340737:web:ba5d32165dcd1044cabcc0"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+
+    function showMessage(text, isError = false) {
+      const msg = document.getElementById("message");
+      msg.textContent = text;
+      msg.style.color = isError ? "red" : "green";
+    }
+
+    function login() {
+      const email = document.getElementById("email").value;
+      const pass = document.getElementById("password").value;
+      auth.signInWithEmailAndPassword(email, pass)
+        .then(() => showMessage("Successfully logged in!"))
+        .catch(err => showMessage(err.message, true));
+    }
+
+    function register() {
+      const email = document.getElementById("email").value;
+      const pass = document.getElementById("password").value;
+      auth.createUserWithEmailAndPassword(email, pass)
+        .then(() => showMessage("Registration successful! You can now log in."))
+        .catch(err => showMessage(err.message, true));
+    }
+
+    function logout() {
+      auth.signOut();
+    }
+  </script>
+
+  <!-- SQL.js Loader and Card DB Logic -->
+  <script type="module">
+    import initSqlJs from './sql-wasm.js';
+
+    window.initSqlJs = initSqlJs;
+
+    function loadCardDatabase() {
+      initSqlJs({ locateFile: file => file }).then(SQL => {
+        fetch('cards.db')
+          .then(res => res.arrayBuffer())
+          .then(buffer => {
+            const db = new SQL.Database(new Uint8Array(buffer));
+            const result = db.exec("SELECT * FROM cards;");
+            console.log("Loaded card data:", result);
+            window.cardDB = db;
+
+            const cardGrid = document.getElementById("cardGrid");
+            cardGrid.innerHTML = '';
+            cardGrid.classList.remove("hidden");
+
+            if (result.length > 0 && result[0].values) {
+              result[0].values.forEach(row => {
+                const [id, name, atk, def, imgPath] = row;
+                const card = document.createElement("div");
+                card.className = "card";
+                card.innerHTML = `
+                  <img src="${imgPath || '1-20.jpg'}" alt="Card image">
+                  <h4>${name}</h4>
+                  <p>ATK: ${atk} / DEF: ${def}</p>
+                `;
+                cardGrid.appendChild(card);
+              });
+            }
+          })
+          .catch(err => console.error("Failed to load cards.db", err));
+      });
+    }
+
+    firebase.auth().onAuthStateChanged(user => {
+      if (user) {
+        document.getElementById("loginDiv").classList.add("hidden");
+        document.getElementById("userDiv").classList.remove("hidden");
+        document.getElementById("userEmail").innerText = user.email;
+        document.getElementById("userUid").innerText = user.uid;
+        window.currentUserUID = user.uid;
+
+        loadCardDatabase();
+      } else {
+        document.getElementById("loginDiv").classList.remove("hidden");
+        document.getElementById("userDiv").classList.add("hidden");
+        document.getElementById("cardGrid").classList.add("hidden");
+      }
+    });
+  </script>
+
+</body>
+</html>

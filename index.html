@@ -101,7 +101,7 @@
     window.initSqlJs = initSqlJs;
 
     function loadCardDatabase() {
-      initSqlJs({ locateFile: file => file }).then(SQL => {
+      initSqlJs({ locateFile: file => `./${file}` }).then(SQL => {
         fetch('cards.db')
           .then(res => res.arrayBuffer())
           .then(buffer => {
